@@ -6,8 +6,12 @@ bot = telebot.TeleBot(config.token)
 
 waitingForToken = []
 
+class User:
+    id = 0
+
+
 class Game:
-    flag = 0
+ flag = 0
     playerIds = []
     MapPlayer1 = []
     MapPlayer2 = []
