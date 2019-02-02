@@ -1,6 +1,7 @@
 import telebot
 import config
 import random
+import time
 
 bot = telebot.TeleBot(config.token)
 
@@ -8,11 +9,12 @@ OFFLINE = False
 ONLINE = True
 
 class Game:
-    flag = OFFLINE
-    playerIds = []
-    MapPlayer1 = []
-    MapPlayer2 = []
     def __init__(self, ID):
+        self.flag = OFFLINE
+        self.playerIds = []
+        self.MapPlayer1 = []
+        self.MapPlayer2 = []
+        
         self.playerIds.append(ID)
         for n in range(5):
             self.MapPlayer1.append([0]*5)
@@ -43,14 +45,16 @@ waitingForToken = []
 waitingTokens = []
 tokensGame = {}
 
-def disconnect(token):
+def disconnect(id):
+    token = idsTokens[id]
     del tokensGame[token]
     return
 
 def generateToken():
+    random.seed(time.time())
     token = random.randint(10000, 99999)
-    while tokensGame.get(token) != None:
-        token = random.randint(10000, 99999)
+    #while token in tokensGame:
+    #    token = random.randint(10000, 99999)
     return token
 
 def establishConnection(token, PlayerId):
@@ -69,15 +73,28 @@ def establishConnection(token, PlayerId):
 @bot.message_handler(commands=["create", "join", "exit"])
 def ReactToCommands(message):
     PlayerId = message.chat.id
+    print("\n" + str(PlayerId))
     if PlayerId in waitingForToken:
         waitingForToken.remove(PlayerId)
         bot.send_message(PlayerId, "Ожидание токена прерванно!")
     if idsStates.get(PlayerId) == ONLINE:
-        disconnect(idsTokens[PlayerId])
+        print(PlayerId)
+        disconnect(PlayerId)
     if message.text == "/create":
         token = generateToken()
+        print("Token: " + str(token))
         idsTokens[PlayerId] = token
-        tokensGame[token] = Game(PlayerId)
+        print("Saved ids: ")
+        for id, t in idsTokens.items():
+            print(id)
+        print("Before:")
+        for t, game in tokensGame.items():
+            print(game.playerIds)
+        AGame = Game(PlayerId)
+        tokensGame[token] = AGame
+        print("After:")
+        for t, game in tokensGame.items():
+            print(game.playerIds)
         idsStates[PlayerId] = ONLINE
         waitingTokens.append(token)
         bot.send_message(PlayerId, "Ваш токен: " + str(token))
