@@ -14,7 +14,7 @@ class Game:
         self.playerIds = []
         self.MapPlayer1 = []
         self.MapPlayer2 = []
-        
+
         self.playerIds.append(ID)
         for n in range(5):
             self.MapPlayer1.append([0]*5)
@@ -53,8 +53,8 @@ def disconnect(id):
 def generateToken():
     random.seed(time.time())
     token = random.randint(10000, 99999)
-    #while token in tokensGame:
-    #    token = random.randint(10000, 99999)
+    while token in tokensGame:
+        token = random.randint(10000, 99999)
     return token
 
 def establishConnection(token, PlayerId):
