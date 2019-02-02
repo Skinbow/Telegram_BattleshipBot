@@ -2,6 +2,8 @@ import telebot
 import config
 import random
 
+Vowels = [u"а", u"е", u"ё", u"и", u"о", u"у", u"э", u"ю", u"ы", u"я", "a", "e", "i", "o", "u", "y"]
+
 bot = telebot.TeleBot(config.token)
 
 OFFLINE = False
@@ -30,6 +32,12 @@ class Game:
         self.flag = ONLINE
     def getPlayersIds(self):
         return self.playerIds
+    def getOtherPlayerId(self, id):
+        if self.playerIds[0] == id:
+            return self.playerIds[1]
+        elif self.playerIds[1] == id:
+            return self.playerIds[0]
+        return -1
 
 idsStates = {}
 idsTokens = {}
@@ -46,6 +54,19 @@ def generateToken():
     while tokensGame.get(token) != None:
         token = random.randint(10000, 99999)
     return token
+
+def establishConnection(token, PlayerId):
+    if token in waitingTokens:
+        idsStates[PlayerId] = ONLINE
+        idsTokens[PlayerId] = token
+        # Joining the two players
+        tokensGame[token].connect(PlayerId)
+        # Deleting players from waitingForToken and waitingGames
+        waitingTokens.remove(token)
+        waitingForToken.remove(PlayerId)
+    else:
+        bot.send_message(PlayerId, "Такого токена не существует!")
+    return
 
 @bot.message_handler(commands=["create", "join", "exit"])
 def ReactToCommands(message):
@@ -70,29 +91,29 @@ def ReactToCommands(message):
         pass
 
 @bot.message_handler(content_types=["text"])
-def Battleships(message):
+def ReactToText(message):
     PlayerId = message.chat.id
     #for game in GamesList:
     #    if message.chat.id in game.getPlayersIds():
 
     # Establishing a connection between two players
-    try:
-        token = int(message.text)
-        if PlayerId in waitingForToken:
-            if token in waitingTokens:
-                idsStates[PlayerId] = ONLINE
-                idsTokens[PlayerId] = token
-                # Joining the two players
-                tokensGame[token].connect(PlayerId)
-                # Deleting players from waitingForToken and waitingGames
-                waitingTokens.remove(token)
-                waitingForToken.remove(PlayerId)
-            else:
-                bot.send_message(PlayerId, "Такого токена не существует!")
-        else:
-            bot.send_message(PlayerId, "Неверная команда!")
-    except:
-        bot.send_message(PlayerId, "Неверный токен!")
+    if PlayerId in waitingForToken:
+        try:
+            token = int(message.text)
+            establishConnection(token, PlayerId)
+        except:
+            bot.send_message(PlayerId, "Неверный токен!")
+    elif idsStates.get(PlayerId) == ONLINE:
+        if len(tokensGame[idsTokens[PlayerId]].playerIds) < 2:
+            disconnect(idsTokens[PlayerId])
+            return
+        otherPlayer = tokensGame[idsTokens[PlayerId]].getOtherPlayerId(PlayerId)
+        textMessage = message.text
+        ToSend = ""
+        for char in textMessage:
+            if char.lower() not in Vowels:
+                ToSend += char
+        bot.send_message(otherPlayer, ToSend)
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
