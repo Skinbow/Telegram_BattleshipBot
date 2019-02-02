@@ -1,6 +1,7 @@
 import telebot
 import config
 import random
+import time
 
 Vowels = [u"а", u"е", u"ё", u"и", u"о", u"у", u"э", u"ю", u"ы", u"я", "a", "e", "i", "o", "u", "y"]
 
@@ -10,11 +11,12 @@ OFFLINE = False
 ONLINE = True
 
 class Game:
-    flag = OFFLINE
-    playerIds = []
-    MapPlayer1 = []
-    MapPlayer2 = []
     def __init__(self, ID):
+        self.flag = OFFLINE
+        self.playerIds = []
+        self.MapPlayer1 = []
+        self.MapPlayer2 = []
+
         self.playerIds.append(ID)
         for n in range(5):
             self.MapPlayer1.append([0]*5)
@@ -50,8 +52,9 @@ def disconnect(token):
     return
 
 def generateToken():
+    random.seed(time.time())
     token = random.randint(10000, 99999)
-    while tokensGame.get(token) != None:
+    while token in tokensGame:
         token = random.randint(10000, 99999)
     return token
 
@@ -113,7 +116,8 @@ def ReactToText(message):
         for char in textMessage:
             if char.lower() not in Vowels:
                 ToSend += char
-        bot.send_message(otherPlayer, ToSend)
+        if ToSend != "":
+            bot.send_message(otherPlayer, ToSend)
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
