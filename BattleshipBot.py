@@ -73,28 +73,15 @@ def establishConnection(token, PlayerId):
 @bot.message_handler(commands=["create", "join", "exit"])
 def ReactToCommands(message):
     PlayerId = message.chat.id
-    print("\n" + str(PlayerId))
     if PlayerId in waitingForToken:
         waitingForToken.remove(PlayerId)
         bot.send_message(PlayerId, "Ожидание токена прерванно!")
     if idsStates.get(PlayerId) == ONLINE:
-        print(PlayerId)
         disconnect(PlayerId)
     if message.text == "/create":
         token = generateToken()
-        print("Token: " + str(token))
         idsTokens[PlayerId] = token
-        print("Saved ids: ")
-        for id, t in idsTokens.items():
-            print(id)
-        print("Before:")
-        for t, game in tokensGame.items():
-            print(game.playerIds)
-        AGame = Game(PlayerId)
-        tokensGame[token] = AGame
-        print("After:")
-        for t, game in tokensGame.items():
-            print(game.playerIds)
+        tokensGame[token] = Game(PlayerId)
         idsStates[PlayerId] = ONLINE
         waitingTokens.append(token)
         bot.send_message(PlayerId, "Ваш токен: " + str(token))
