@@ -9,16 +9,17 @@ OFFLINE = False
 ONLINE = True
 
 class Game:
+    waitingForCoord = []
     def __init__(self, ID):
         self.flag = OFFLINE
         self.playerIds = []
-        self.MapPlayer1 = []
-        self.MapPlayer2 = []
-
+        self.MapPlayer = []
         self.playerIds.append(ID)
-        for n in range(5):
-            self.MapPlayer1.append([0]*5)
-            self.MapPlayer2.append([0]*5)
+        for i in range(2):
+            TempMatrix = []
+            for n in range(5):
+                TempMatrix.append([0]*5)
+            self.MapPlayer.append(TempMatrix)
     def __del__(self):
         for id in self.playerIds:
             bot.send_message(id, "Игра прервана!")
@@ -30,6 +31,8 @@ class Game:
         for id in self.playerIds:
             bot.send_message(id, "Соединение установлено!")
         self.flag = ONLINE
+        self.waitingForCoord.append(self.playerIds[0])
+        self.waitingForCoord.append(self.playerIds[1])
     def getPlayersIds(self):
         return self.playerIds
     def getOtherPlayerId(self, id):
@@ -38,6 +41,25 @@ class Game:
         elif self.playerIds[1] == id:
             return self.playerIds[0]
         return -1
+    def getIndexOfPlayer(self, PlayerId):
+        if self.playerIds[0] == PlayerId:
+            return 0
+        elif self.playerIds[1] == PlayerId:
+            return 1
+    def createOneSquareShip(self, PlayerId, x, y):
+        self.MapPlayer[self.getIndexOfPlayer(PlayerId)][x][y] = 1
+        return
+    def GetFormattedMap(self, PlayerId):
+        resultText = ""
+        for y in range(5):
+            line = self.MapPlayer[self.getIndexOfPlayer(PlayerId)][y]
+            for square in line:
+                if square == 1:
+                    resultText += "#"
+                else:
+                    resultText += "."
+            resultText += "\n"
+        return resultText
 
 idsStates = {}
 idsTokens = {}
@@ -97,16 +119,22 @@ def Battleships(message):
     PlayerId = message.chat.id
     #for game in GamesList:
     #    if message.chat.id in game.getPlayersIds():
-
     # Establishing a connection between two players
     if PlayerId in waitingForToken:
-        try:
+        #try:
             token = int(message.text)
             establishConnection(token, PlayerId)
-        except:
-            bot.send_message(PlayerId, "Неверный токен!")
+        #except:
+        #    bot.send_message(PlayerId, "Неверный токен!")
     elif idsStates.get(PlayerId) == ONLINE:
         pass
+    if idsStates.get(PlayerId) == ONLINE:
+        if PlayerId in Game.waitingForCoord:
+            for s in message.text.split(" "):
+                x = ord(s[0]) - 65
+                y = int(s[1]) - 1
+                tokensGame[idsTokens[PlayerId]].createOneSquareShip(PlayerId, x, y)
+                bot.send_message(PlayerId, tokensGame[idsTokens[PlayerId]].GetFormattedMap(PlayerId))
 
 if __name__ == "__main__":
     bot.polling(none_stop=True)
