@@ -25,6 +25,7 @@ class Game:
         self.MapPlayer = []
         self.GameMap = []
         self.playerIds.append(ID)
+        #self.playerIndexes = {ID : 0}
         for i in range(2):
             TempMatrix = []
             for n in range(5):
@@ -69,36 +70,43 @@ class Game:
         elif self.playerIds[1] == id:
             return 1
 
+    # Using an id, obtain their index in all the Game class arrays
+    def getIndexOfOtherPlayer(self, id):
+        if self.playerIds[0] == id:
+            return 1
+        elif self.playerIds[1] == id:
+            return 0
+
     # Used to place one one-deck ship on the MapPlayer at the beginning of the game
-    def createOneSquareShip(self, PlayerId, x, y):
-        PlayerIndex = self.getIndexOfPlayer(PlayerId)
+    def createOneSquareShip(self, id, x, y):
+        PlayerIndex = self.getIndexOfPlayer(id)
         if self.ready[PlayerIndex]:
-            bot.send_message(PlayerId, "Вы уже расставили все возможные корабли!")
+            bot.send_message(id, "Вы уже расставили все возможные корабли!")
         elif self.shipCounter[PlayerIndex] < self.shipLimit:
-            if self.MapPlayer[PlayerIndex][x][y] != 1:
-                self.MapPlayer[PlayerIndex][x][y] = 1
+            if self.MapPlayer[PlayerIndex][y][x] != 1:
+                self.MapPlayer[PlayerIndex][y][x] = 1
                 self.shipCounter[PlayerIndex] += 1
             else:
-                bot.send_message(PlayerId, "Там уже стоит корабль!")
+                bot.send_message(id, "Там уже стоит корабль!")
 
             if self.shipCounter[PlayerIndex] == self.shipLimit:
                 self.ready[PlayerIndex] = True
-                self.waitingForCoord.remove(PlayerId)
-                bot.send_message(self.getOtherPlayerId(PlayerId), "Ваш соперник готов!")
-                if self.ready[self.getIndexOfPlayer(self.getOtherPlayerId(PlayerId))] == True:
-                    bot.send_message(PlayerId, "Игра началась!")
-                    bot.send_message(self.getOtherPlayerId(PlayerId), "Игра началась!")
+                self.waitingForCoord.remove(id)
+                bot.send_message(self.getOtherPlayerId(id), "Ваш соперник готов!")
+                if self.ready[self.getIndexOfPlayer(self.getOtherPlayerId(id))] == True:
+                    bot.send_message(id, "Игра началась!")
+                    bot.send_message(self.getOtherPlayerId(id), "Игра началась!")
                     self.flag = INGAME
                     bot.send_message(self.playerIds[self.turn], self.GetFormattedShotsMap(self.playerIds[self.turn]))
         return
 
-    # Used to shoot at a square on GameMap and record whether it hit a ship or not
-    def Shoot(self, PlayerId, x, y):
-        PlayerIndex = self.getIndexOfPlayer(PlayerId)
+    # Used to shoot at a square on GameMap and record whether it hit a ship or not (return -1 when square has already been hit by player)
+    def Shoot(self, id, x, y):
+        PlayerIndex = self.getIndexOfPlayer(id)
         # If the square has never been shot:
         if self.GameMap[PlayerIndex][x][y] == 0:
             # If the player hit a ship:
-            if self.MapPlayer[PlayerIndex][x][y] == 1:
+            if self.MapPlayer[self.getIndexOfOtherPlayer(id)][x][y] == 1:
                 self.GameMap[PlayerIndex][x][y] = 2
             # If the player didn't hit a ship:
             else:
@@ -106,7 +114,8 @@ class Game:
             self.SwitchTurn()
         # If the square has already been shot:
         else:
-            bot.send_message(PlayerId, "Вы уже стреляли в эту клетку!")
+            bot.send_message(id, "Вы уже стреляли в эту клетку!")
+            return -1
 
     # Change player's turn
     def SwitchTurn(self):
@@ -116,12 +125,13 @@ class Game:
             self.turn == 0
 
     # Obtain a string representing the ship positionment map
-    def GetFormattedMap(self, PlayerId):
+    def GetFormattedMap(self, id):
         resultText = ""
-        resultText += " ABCDE\n"
+        resultText += "•ABCDE"
         for y in range(5):
-            line = self.MapPlayer[self.getIndexOfPlayer(PlayerId)][y]
-            resultText += str(y)
+            resultText += "\n"
+            line = self.MapPlayer[self.getIndexOfPlayer(id)][y]
+            resultText += str(y+1)
             for square in line:
                 # There's a ship there:
                 if square == 1:
@@ -129,16 +139,16 @@ class Game:
                 # There's no ship there:
                 else:
                     resultText += "~"
-            resultText += "\n"
         return resultText
 
     # Obtain a string representing the squares shot by the player
-    def GetFormattedShotsMap(self, PlayerId):
+    def GetFormattedShotsMap(self, id):
         resultText = ""
-        resultText += " ABCDE\n"
+        resultText += "•ABCDE"
         for y in range(5):
-            line = self.GameMap[self.getIndexOfPlayer(PlayerId)][y]
-            resultText += str(y)
+            resultText += "\n"
+            line = self.GameMap[self.getIndexOfPlayer(id)][y]
+            resultText += str(y+1)
             for square in line:
                 # There was a ship there:
                 if square == 2:
@@ -149,7 +159,6 @@ class Game:
                 # The tile has never been shot at:
                 else:
                     resultText += "~"
-            resultText += "\n"
         return resultText
 
 idsStates = {}
@@ -189,8 +198,8 @@ def establishConnection(token, PlayerId):
         bot.send_message(PlayerId, "Такого токена не существует!")
     return
 
-# From a two-character input, such as, for example, "A3", get the corresponding x and y coordinates
-def GetXYFromInput(s):
+# From a two-character input, such as, for example, "A3", get the corresponding x and y coordinates in an array [x,y]
+def GetXYFromInput(s, PlayerId):
     if len(s) > 2:
         bot.send_message(PlayerId, "Неверный ввод!")
         return -1
@@ -256,26 +265,30 @@ def Battleships(message):
 
     # Players are already connected
     elif idsStates.get(PlayerId) == CONNECT:
+        CurrentGame = tokensGame[idsTokens[PlayerId]]
         # We are waiting for the player to enter the ship coordinates
         if PlayerId in Game.waitingForCoord:
             for s in message.text.split(" "):
-                l = GetXYFromInput(s)
-                if l == -1 return
+                l = GetXYFromInput(s, PlayerId)
+                if l == -1: return
                 x = l[0]
                 y = l[1]
                 # Place one single-decked ship on the game field
-                tokensGame[idsTokens[PlayerId]].createOneSquareShip(PlayerId, x, y)
-                # Print the resulting map of the player's ships
-            bot.send_message(PlayerId, tokensGame[idsTokens[PlayerId]].GetFormattedMap(PlayerId))
+                CurrentGame.createOneSquareShip(PlayerId, x, y)
+            # Print the resulting map of the player's ships
+            bot.send_message(PlayerId, CurrentGame.GetFormattedMap(PlayerId))
 
         # The player is currently playing the game
-        elif tokensGame[idsTokens[PlayerId]].flag == INGAME:
-            if tokensGame[idsTokens[PlayerId]].playerIds[tokensGame[idsTokens[PlayerId]].turn] == PlayerId:
-                l = GetXYFromInput(message.text)
-                if l == -1 return
-                x = l[0]
-                y = l[1]
-                tokensGame[idsTokens[PlayerId]].Shoot(PlayerId, x, y)
+        elif CurrentGame.flag == INGAME:
+            if CurrentGame.playerIds[CurrentGame.turn] == PlayerId:
+                # check is used for checking if the player has entered correct coordinates
+                check = -1
+                while check == -1:
+                    l = GetXYFromInput(message.text, PlayerId)
+                    if l == -1: return
+                    x = l[0]
+                    y = l[1]
+                    check = CurrentGame.Shoot(PlayerId, x, y)
             else:
                 bot.send_message(PlayerId, "Сейчас не ваш ход!")
 
