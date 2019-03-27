@@ -319,13 +319,14 @@ def Battleships(message):
                 if l == -1: return
                 x = l[0]
                 y = l[1]
-                AGame.Shoot(PlayerId, x, y)
+                check = AGame.Shoot(PlayerId, x, y)
                 bot.send_message(PlayerId, AGame.GetFormattedShotsMap(PlayerId))
                 if AGame.sunkShips[0] == AGame.shipLimit or AGame.sunkShips[1] == AGame.shipLimit:
                     EndGameMessage(AGame)
                     disconnect(PlayerId)
                     exit()
-                AGame.SwitchTurn(PlayerId)
+                if check != -1:
+                    AGame.SwitchTurn(PlayerId)
             else:
                 bot.send_message(PlayerId, "Сейчас не ваш ход!")
 
