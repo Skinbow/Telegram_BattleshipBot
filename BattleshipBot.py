@@ -315,14 +315,10 @@ def Battleships(message):
         # The player is currently playing the game
         elif AGame.flag == INGAME:
             if AGame.playerIds[AGame.turn] == PlayerId:
-                # check is used for checking if the player has entered correct coordinates
-                check = -1
-                while check == -1:
-                    l = GetXYFromInput(message.text, PlayerId)
-                    if l == -1: return
-                    x = l[0]
-                    y = l[1]
-                    check = AGame.Shoot(PlayerId, x, y)
+                l = GetXYFromInput(message.text, PlayerId)
+                if l == -1: return
+                x = l[0]
+                y = l[1]
                 bot.send_message(PlayerId, AGame.GetFormattedShotsMap(PlayerId))
                 if AGame.sunkShips[0] == AGame.shipLimit or AGame.sunkShips[1] == AGame.shipLimit:
                     EndGameMessage(AGame)
