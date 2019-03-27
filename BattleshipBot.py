@@ -52,7 +52,6 @@ class Game:
                 bot.send_message(id, "Игра прервана!")
             idsStates[id] = OFFLINE
             del idsTokens[id]
-        #del tokensGame[]
 
     # Used to connect two players
     def connect(self, id):
