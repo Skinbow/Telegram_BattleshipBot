@@ -14,7 +14,7 @@ waitingForToken = []
 waitingTokens = []
 tokensGame = {}
 
-# State for Game.flag
+# State for Game.flag and idsStates
 OFFLINE = 0
 CONNECT = 1
 INGAME = 2
@@ -24,7 +24,7 @@ class Game:
     shipLimit = 5
     # Initializer
     def __init__(self, ID):
-        self.boardSize = [10, 10]
+        self.boardSize = [5, 5]
         self.flag = OFFLINE
         self.turn = 0
         self.shipCounter = [0, 0]
@@ -48,7 +48,8 @@ class Game:
     # Destructor
     def __del__(self):
         for id in self.playerIds:
-            bot.send_message(id, "Игра прервана!")
+            if self.sunkShips[0] < self.shipLimit and self.sunkShips[0] < self.shipLimit:
+                bot.send_message(id, "Игра прервана!")
             idsStates[id] = OFFLINE
             del idsTokens[id]
         #del tokensGame[]
@@ -89,7 +90,9 @@ class Game:
     def createOneSquareShip(self, id, x, y):
         PlayerIndex = self.getIndexOfPlayer(id)
         if self.ready[PlayerIndex]:
+            bot.send_message(id, "Максимальное количество кораблей: {0}".format(sel.shipLimit))
             bot.send_message(id, "Вы уже расставили все возможные корабли!")
+            bot.send_message(id, "Ждите своего соперника!")
         elif self.shipCounter[PlayerIndex] < self.shipLimit:
             if self.MapPlayer[PlayerIndex][y][x] != 1:
                 self.MapPlayer[PlayerIndex][y][x] = 1
@@ -129,15 +132,20 @@ class Game:
             return -1
 
     # Change player's turn
-    def SwitchTurn(self):
+    def SwitchTurn(self, PlayerId):
         if self.turn == 0:
             self.turn = 1
         else:
             self.turn = 0
+        bot.send_message(PlayerId, "Ход вашего соперника.")
+        bot.send_message(PlayerId, self.GetFormattedMap(PlayerId, "Ваша карта:\n\n"))
+        bot.send_message(PlayerId, self.GetFormattedShotsMap(self.getOtherPlayerId(PlayerId), "Места куда стрелял ваш соперник:\n\n"))
+        bot.send_message(self.getOtherPlayerId(PlayerId), "Ваш ход!")
+        bot.send_message(self.getOtherPlayerId(PlayerId), self.GetFormattedShotsMap(self.getOtherPlayerId(PlayerId)))
 
     # Obtain a string representing the ship positionment map
-    def GetFormattedMap(self, id):
-        resultText = "• "
+    def GetFormattedMap(self, id, beginningMessage=""):
+        resultText = beginningMessage + "• "
         for i in range(self.boardSize[0]):
             resultText += chr(i + 65)
         for y in range(self.boardSize[1]):
@@ -154,8 +162,8 @@ class Game:
         return resultText
 
     # Obtain a string representing the squares shot by the player
-    def GetFormattedShotsMap(self, id):
-        resultText = "• "
+    def GetFormattedShotsMap(self, id, beginningMessage=""):
+        resultText = beginningMessage + "• "
         for i in range(self.boardSize[0]):
             resultText += chr(i + 65)
         for y in range(self.boardSize[1]):
@@ -168,7 +176,7 @@ class Game:
                     resultText += "#"
                 # There was no ship there:
                 elif square == 1:
-                    resultText += "∙"
+                    resultText += "⊙"
                 # The tile has never been shot at:
                 else:
                     resultText += "~"
@@ -208,31 +216,31 @@ def establishConnection(token, PlayerId):
 
 # From a two-character input, such as, for example, "A3", get the corresponding x and y coordinates in an array [x,y]
 def GetXYFromInput(s, PlayerId):
-    CurrentGame = tokensGame[idsTokens[PlayerId]]
+    AGame = tokensGame[idsTokens[PlayerId]]
     if len(s) > 2:
-        bot.send_message(PlayerId, "Неверный ввод!")
+        bot.send_message(PlayerId, "Неверный ввод: {0}".format(s))
         return -1
     x = ord(s[0]) - 65
     # Checking for characters outside of the A-E interval
-    if x < 0 or x >= CurrentGame.boardSize[0]:
-        x -= 25
+    if x < 0 or x >= AGame.boardSize[0]:
+        x -= 32
         # Checking for characters outside of the a-e interval
-        if x < 0 or x > CurrentGame.boardSize[0]:
-            bot.send_message(PlayerId, "Неверный ввод!")
+        if x < 0 or x >= AGame.boardSize[0]:
+            bot.send_message(PlayerId, "Неверный ввод: {0}".format(s))
             return -1
     y = int(s[1]) - 1
     # Checking for numbers outside of the 1-5 interval
-    if y < 0 or y > CurrentGame.boardSize[1]:
-        bot.send_message(PlayerId, "Неверный ввод!")
+    if y < 0 or y >= AGame.boardSize[1]:
+        bot.send_message(PlayerId, "Неверный ввод: {0}".format(s))
         return -1
     return [x, y]
 
 # Send the end game messages
-def EndGameMessage(CurrentGame):
-    bot.send_message(CurrentGame.playerIds[0], "Игра окончена!")
-    bot.send_message(CurrentGame.playerIds[0], "Игра окончена!")
-    for PlayerId in CurrentGame.playerIds:
-        if CurrentGame.sunkShips[CurrentGame.getIndexOfPlayer(PlayerId)] == CurrentGame.shipLimit:
+def EndGameMessage(AGame):
+    bot.send_message(AGame.playerIds[0], "Игра окончена!")
+    bot.send_message(AGame.playerIds[1], "Игра окончена!")
+    for PlayerId in AGame.playerIds:
+        if AGame.sunkShips[AGame.getIndexOfPlayer(PlayerId)] == AGame.shipLimit:
             bot.send_message(PlayerId, "Вы выиграли!")
         else:
             bot.send_message(PlayerId, "Вы проиграли!")
@@ -285,47 +293,43 @@ def Battleships(message):
 
     # Players are already connected
     elif idsStates.get(PlayerId) == CONNECT:
-        CurrentGame = tokensGame[idsTokens[PlayerId]]
+        AGame = tokensGame[idsTokens[PlayerId]]
         # We are waiting for the player to enter the ship coordinates
         if PlayerId in Game.waitingForCoord:
             for s in message.text.split(" "):
                 l = GetXYFromInput(s, PlayerId)
-                if l == -1: return
+                if l == -1: continue
                 x = l[0]
                 y = l[1]
                 # Place one single-decked ship on the game field
-                CurrentGame.createOneSquareShip(PlayerId, x, y)
+                AGame.createOneSquareShip(PlayerId, x, y)
                 # If the player is ready and can't place any other ships, break
-                if CurrentGame.ready[CurrentGame.getIndexOfPlayer(PlayerId)]:
+                if AGame.ready[AGame.getIndexOfPlayer(PlayerId)]:
                     break
             # Print the resulting map of the player's ships
-            bot.send_message(PlayerId, CurrentGame.GetFormattedMap(PlayerId))
+            bot.send_message(PlayerId, AGame.GetFormattedMap(PlayerId))
             # Check if both players are ready
-            if CurrentGame.CheckIfBothPlayersAreReady():
-                bot.send_message(CurrentGame.playerIds[CurrentGame.turn], "Ваш ход!")
-                bot.send_message(CurrentGame.playerIds[CurrentGame.turn], CurrentGame.GetFormattedShotsMap(CurrentGame.playerIds[CurrentGame.turn]))
+            if AGame.CheckIfBothPlayersAreReady():
+                bot.send_message(AGame.playerIds[AGame.turn], "Ваш ход!")
+                bot.send_message(AGame.playerIds[AGame.turn], AGame.GetFormattedShotsMap(AGame.playerIds[AGame.turn]))
 
         # The player is currently playing the game
-        elif CurrentGame.flag == INGAME:
-            if CurrentGame.playerIds[CurrentGame.turn] == PlayerId:
+        elif AGame.flag == INGAME:
+            if AGame.playerIds[AGame.turn] == PlayerId:
                 # check is used for checking if the player has entered correct coordinates
                 check = -1
                 while check == -1:
                     l = GetXYFromInput(message.text, PlayerId)
                     if l == -1: return
-                    x = l[1]
-                    y = l[0]
-                    check = CurrentGame.Shoot(PlayerId, x, y)
-                bot.send_message(PlayerId, CurrentGame.GetFormattedShotsMap(PlayerId))
-                #if CurrentGame.sunkShips[0] == CurrentGame.shipLimit or CurrentGame.sunkShips[1] == CurrentGame.shipLimit:
-                #    EndGameMessage(CurrentGame)
-                #    disconnect(PlayerId)
-                #    exit()
-                CurrentGame.SwitchTurn()
-                bot.send_message(PlayerId, "Ход вашего соперника.")
-                #bot.send_message(PlayerId, )
-                bot.send_message(CurrentGame.getOtherPlayerId(PlayerId), "Ваш ход!")
-                bot.send_message(CurrentGame.getOtherPlayerId(PlayerId), CurrentGame.GetFormattedShotsMap(CurrentGame.getOtherPlayerId(PlayerId)))
+                    x = l[0]
+                    y = l[1]
+                    check = AGame.Shoot(PlayerId, x, y)
+                bot.send_message(PlayerId, AGame.GetFormattedShotsMap(PlayerId))
+                if AGame.sunkShips[0] == AGame.shipLimit or AGame.sunkShips[1] == AGame.shipLimit:
+                    EndGameMessage(AGame)
+                    disconnect(PlayerId)
+                    exit()
+                AGame.SwitchTurn(PlayerId)
             else:
                 bot.send_message(PlayerId, "Сейчас не ваш ход!")
 
